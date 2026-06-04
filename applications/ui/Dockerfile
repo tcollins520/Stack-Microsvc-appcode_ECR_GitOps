@@ -21,6 +21,7 @@ WORKDIR /
 # copy maven and pom files to root dir(work dir)
 COPY .mvn .mvn
 COPY mvnw .
+RUN chmod +x mvnw
 COPY pom.xml .
 
 # caching
