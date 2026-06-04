@@ -9,7 +9,7 @@
 image:
   repository: 788143860357.dkr.ecr.us-east-1.amazonaws.com/retail-store/ui
   pullPolicy: IfNotPresent
-  tag: sha-2f70b2a
+  tag: sha-ae2577e
 
 containerPort: 8080
 
