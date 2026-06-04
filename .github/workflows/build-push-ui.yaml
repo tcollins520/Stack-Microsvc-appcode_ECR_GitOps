@@ -61,7 +61,7 @@ jobs:
 
       - name: Update Helm values file with new image tag
         run: |
-          cd applications/ui
+          cd helm
           git config user.name "ci-bot"
           git config user.email "ci-bot@tcapp.xyz"
           sed -i "s|^  tag: .*|  tag: sha-${GITHUB_SHA::7}|" ui-chart/values.yaml
