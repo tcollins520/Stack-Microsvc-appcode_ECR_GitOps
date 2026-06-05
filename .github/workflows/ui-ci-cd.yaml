@@ -1,0 +1,101 @@
+name: Build and Push UI Service to ECR and Update Helm Values with New Image Tag
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "applications/ui/**"
+      - ".github/workflows/ui-ci-cd.yaml"
+
+permissions:
+  id-token: write
+  contents: write
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: retail-store/ui
+
+jobs:
+  build-and-push-ui:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout App Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::788143860357:role/github-actions-oidc-role-ui3
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Define image tags
+        run: |
+          SHA_TAG=sha-${GITHUB_SHA::7}
+          IMAGE_BASE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
+
+          echo "IMAGE_BASE=$IMAGE_BASE" >> $GITHUB_ENV
+          echo "SHA_TAG=$SHA_TAG" >> $GITHUB_ENV
+
+      - name: Build and push Docker images
+        run: |
+          for tag in latest $SHA_TAG; do
+            IMAGE_URI="$IMAGE_BASE:$tag"
+
+            echo "Building and pushing $IMAGE_URI"
+
+            docker build -t $IMAGE_URI applications/ui
+            docker push $IMAGE_URI
+          done
+
+      - name: CI Complete
+        run: |
+          echo "Image push complete"
+          echo "Image: $IMAGE_BASE:$SHA_TAG"
+  update-gitops:
+    needs: build-and-push-ui
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitOps repo (Helm)
+        uses: actions/checkout@v4
+        with:
+          repository: tcollins520/Stack-Microsvc-K8s_Helm_Karpenter_ArgoCD_GitOps
+          ref: main
+          token: ${{ secrets.GITOPS_PAT }}
+          path: gitops
+          persist-credentials: true
+
+      - name: Update Helm Values with New Image Tag
+        run: |
+          cd gitops
+
+          sed -i "s|tag: .*|tag: sha-${GITHUB_SHA::7}|" \
+            helm/ui-chart/values.yaml
+
+          echo "Updated image tag to sha-${GITHUB_SHA::7}"
+
+      - name: Commit and push Changes to GitOps Repo
+        run: |
+          cd gitops
+
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@tcapp.xyz"
+
+          git add helm/ui-chart/values.yaml
+         
+          if ! git diff --cached --quiet; then
+           git commit -m "Update UI image tag to sha-${GITHUB_SHA::7}"
+           git push origin main
+          else
+           echo "No changes to commit"
+          fi
+
+      - name: GitOps Update Complete
+        run: |
+          echo "GitOps repository updated successfully"
+          echo "ArgoCD will automatically sync the deployment"
