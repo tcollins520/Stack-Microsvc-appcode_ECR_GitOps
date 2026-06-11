@@ -14,8 +14,9 @@ Blue/Green deployments
 Horizontal Pod Autoscaling
 Observability with OpenTelemetry
 Amazon EKS workloads running on Karpenter-provisioned nodes
+```
 Architecture
-``Developer Commit
+Developer Commit
         │
         ▼
 GitHub Actions
